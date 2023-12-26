@@ -1,1 +1,1 @@
-java -cp "chatServer.jar;kryonet-2.21-all.jar" rs.raf.pds.v4.z5.ChatServer 4555
+java -cp "chatServer.jar;../../lib/kryonet-2.22.9.main.jar" rs.raf.pds.v4.z5.ChatServer 9000

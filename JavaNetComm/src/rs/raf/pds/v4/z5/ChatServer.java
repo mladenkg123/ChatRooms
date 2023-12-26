@@ -2,6 +2,7 @@ package rs.raf.pds.v4.z5;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -11,31 +12,48 @@ import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
 import com.esotericsoftware.kryonet.Server;
 
+import javafx.application.Platform;
+import javafx.scene.control.TextArea;
 import rs.raf.pds.v4.z5.messages.ChatMessage;
+import rs.raf.pds.v4.z5.messages.ChatMessage.MessageType;
 import rs.raf.pds.v4.z5.messages.InfoMessage;
 import rs.raf.pds.v4.z5.messages.KryoUtil;
 import rs.raf.pds.v4.z5.messages.ListUsers;
 import rs.raf.pds.v4.z5.messages.Login;
+import rs.raf.pds.v4.z5.messages.Room;
 import rs.raf.pds.v4.z5.messages.WhoRequest;
+import rs.raf.pds.v4.z5.messages.ListRoomsUpdate;
 
-
-public class ChatServer implements Runnable{
+public class ChatServer implements Runnable,Listener{
 
 	private volatile Thread thread = null;
 	
 	volatile boolean running = false;
 	final Server server;
 	final int portNumber;
+	private TextArea chatArea; 
+
+	
 	ConcurrentMap<String, Connection> userConnectionMap = new ConcurrentHashMap<String, Connection>();
 	ConcurrentMap<Connection, String> connectionUserMap = new ConcurrentHashMap<Connection, String>();
-	
+
 	private List<ChatMessage> messageHistory = new ArrayList<>();
+	private Map<String, List<ChatMessage>> chatRoomsMessages = new ConcurrentHashMap<>();
+	private Map<String, List<String>> userRooms = new ConcurrentHashMap<>();  
+	Map<String, List<String>> roomInvitations = new HashMap<>();
+	private Map<String, Room> chatRooms = new HashMap<>();
+
+	
 	
 	public ChatServer(int portNumber) {
 		this.server = new Server();
 		
 		this.portNumber = portNumber;
 		KryoUtil.registerKryoClasses(server.getKryo());
+		
+		server.getKryo().register(ListRoomsUpdate.class);
+        server.getKryo().register(ArrayList.class);
+
 		registerListener();
 	}
 	private void registerListener() {
@@ -59,9 +77,22 @@ public class ChatServer implements Runnable{
 				    if (chatMessage.isRoomCreation()) {
 				        createChatRoom(chatMessage);
 				    } else if (chatMessage.isInvitation()) {
-				        sendRoomInvitation(chatMessage);
+				    	handleRoomInvitation(connection, chatMessage);
 				    } else if (chatMessage.isPrivateMessage()) {
 				        sendPrivateMessage(chatMessage);
+				    } else if (chatMessage.getTxt().startsWith("/join")) {
+				    	handleJoinRoom(connection, chatMessage);
+				    } else if (chatMessage.getTxt().startsWith("/listrooms")) {
+			            listChatRooms(connection);
+				    } else if (chatMessage.getMessageType() == MessageType.GET_MORE_MESSAGES) {
+					        handleGetMoreMessages(chatMessage);
+					        return;    
+				    } else if (chatMessage.getTxt().startsWith("/")) {
+				        sendRoomMessage(connection, chatMessage);
+				    } else if (object instanceof ChatMessage || object instanceof ListRoomsUpdate) {
+	                    handleMessage(connection, object);
+	                } else if (object instanceof WhoRequest || object instanceof InfoMessage || object instanceof ListUsers) {
+	                	
 				    } else {
 				        System.out.println(chatMessage.getUser() + ":" + chatMessage.getTxt());
 				        handleChatMessage(chatMessage, connection);
@@ -98,23 +129,73 @@ public class ChatServer implements Runnable{
 	
 	
 	
+	
+	 private void handleMessage(Connection connection, Object object) {
+	        if (object instanceof ChatMessage) {
+	            ChatMessage chatMessage = (ChatMessage) object;
+	            if (chatMessage.getRoomName() != null) {
+	                handleRoomMessage(connection, chatMessage);
+	            } else {
+	                handleChatMessage(chatMessage, connection);
+	            }
+	        } else if (object instanceof ListRoomsUpdate) {
+	            ListRoomsUpdate listRoomsUpdate = (ListRoomsUpdate) object;
+	            handleRoomUpdate(connection, listRoomsUpdate);
+	        }
+	    }
+
+	 private void handleRoomMessage(Connection connection, ChatMessage chatMessage) {
+		    String roomName = chatMessage.getRoomName();
+		    String userName = connectionUserMap.get(connection);
+
+		    if (chatRooms.containsKey(roomName)) {
+		        chatRoomsMessages
+		                .computeIfAbsent(roomName, k -> new ArrayList<>())
+		                .add(chatMessage);
+
+		        sendRoomMessage(connection, chatMessage);
+
+		        //sendTextToUser(userName, "Your message in room '" + roomName + "' has been broadcasted.");
+		    } else {
+		        sendTextToUser(userName, "The room '" + roomName + "' does not exist.");
+		    }
+		}
+	 
+	 
+	 
+
+		private void handleRoomUpdate(Connection connection, ListRoomsUpdate listRoomsUpdate) {
+		    // Send the updated list of rooms to all connected clients
+		    for (Connection conn : userConnectionMap.values()) {
+		        if (conn.isConnected() && conn != connection) {
+		            conn.sendTCP(listRoomsUpdate);
+		        }
+		    }
+		}
+
+	
+	
+	
+	
+	
+	
+	
+	
 	// Displaying messages on the server side
 	
 	private void handleChatMessage(ChatMessage chatMessage, Connection connection) {
 	    if (chatMessage.isPrivateMessage()) {
-	        displayServerMessage("Private message from " + chatMessage.getUser() +
-	                " to " + chatMessage.getReceiver() + ": " + chatMessage.getTxt());
+	        displayServerMessage("Private message from " + chatMessage.getUser() + " to " + chatMessage.getReceiver() + ": " + chatMessage.getTxt());
 	    } else if (chatMessage.isRoomCreation()) {
-	        displayServerMessage("Room created by " + chatMessage.getUser() +
-	                ": " + chatMessage.getRoomName());
+	        displayServerMessage("Room created by " + chatMessage.getUser() +": " + chatMessage.getRoomName());
 	    } else if (chatMessage.isInvitation()) {
-	        displayServerMessage("Invitation from " + chatMessage.getUser() +
-	                " to join room " + chatMessage.getRoomName() +
-	                " for user " + chatMessage.getReceiver());
+	        displayServerMessage("Invitation from " + chatMessage.getUser() + " to join room " + chatMessage.getRoomName() +" for user " + chatMessage.getReceiver());
+	    } else if (chatMessage.getRoomName() != null) {
+	    	sendRoomMessage(connection, chatMessage);
 	    } else {
 	        displayServerMessage(chatMessage.getUser() + ": " + chatMessage.getTxt());
 	    }
-
+	    addMessageToHistory(chatMessage);
 	    broadcastChatMessage(chatMessage, connection);
 	}
 
@@ -128,6 +209,107 @@ public class ChatServer implements Runnable{
 	    } else if (object instanceof WhoRequest) {
 	    }
 	}
+	
+	
+
+	
+	
+	
+	private void listChatRooms(Connection connection) {
+	    StringBuilder roomList = new StringBuilder("Available chat rooms: ");
+	    for (String room : chatRooms.keySet()) {
+	        roomList.append(room).append(", ");
+	    }
+	    String rooms = roomList.substring(0, roomList.length() - 2);
+	    sendTextToUser(connectionUserMap.get(connection), rooms);
+
+	    // Send the updated list to the requesting user
+	    connection.sendTCP(new ListRoomsUpdate(new ArrayList<>(chatRooms.keySet())));
+	}
+	
+	
+	
+	
+	private void handleRoomInvitation(Connection connection, ChatMessage invitationMessage) {
+	    String roomName = invitationMessage.getRoomName();
+	    String sender = invitationMessage.getUser();
+	    String receiver = invitationMessage.getReceiver();
+
+	    // Add the invitation to the roomInvitations map
+	    roomInvitations.computeIfAbsent(roomName, k -> new ArrayList<>()).add(receiver);
+
+	    // Notify the sender about the successful invitation
+	    sendTextToUser(sender, "Invitation to room '" + roomName + "' sent to user " + receiver);
+	    System.out.println("Invitation to room '" + roomName + "' sent to user " + receiver);
+	}
+
+	private void handleJoinRoom(Connection connection, ChatMessage joinRoomMessage) {
+	    String roomName = joinRoomMessage.getRoomName();
+	    String userName = connectionUserMap.get(connection);
+	    System.out.println("Room '" + roomName);
+	    System.out.println(userName);
+	    
+	    if (chatRooms.containsKey(roomName)) {
+	        if (roomInvitations.containsKey(roomName) && roomInvitations.get(roomName).contains(userName)) {
+	            Room room = chatRooms.get(roomName);
+
+	            room.addMember(userName);
+
+	            roomInvitations.get(roomName).remove(userName);
+
+	            sendTextToUser(userName, "You have successfully joined the room '" + roomName + "'.");
+
+	            ChatMessage joinMessage = new ChatMessage("Server", userName + " has joined the room.");
+	            joinMessage.setRoomName(roomName);
+	            sendRoomMessage(connection, joinMessage);
+	            if (room.getMessages().size() >= 5) {
+	            	List<ChatMessage> lastMessages = room.getLastNMessages(5);
+		            for (ChatMessage message : lastMessages) {
+		                connection.sendTCP(message);
+		                }
+	            } else {
+	            	
+	            	int n = room.getMessages().size();
+	            	List<ChatMessage> lastNMessages = room.getLastNMessages(n);
+		            for (ChatMessage message : lastNMessages) {
+		                connection.sendTCP(message);
+	            	
+		            }
+	            }
+	            
+	        } else {
+	            sendTextToUser(userName, "You are not invited to join the room '" + roomName + "'.");
+	        }
+	    } else {
+	        sendTextToUser(userName, "The room '" + roomName + "' does not exist.");
+	    }
+	}
+
+	
+	
+	
+	
+	
+	
+	
+
+	private void sendTextToRoom(String roomName, String text) {
+	    Room room = chatRooms.get(roomName);
+
+	    if (room != null) {
+	        List<String> roomMembers = room.getMembers();
+
+	        for (String member : roomMembers) {
+	            Connection memberConnection = userConnectionMap.get(member);
+	            if (memberConnection != null && memberConnection.isConnected()) {
+	                memberConnection.sendTCP(new InfoMessage(text));
+	            }
+	        }
+	    } else {
+	        System.out.println("Room '" + roomName + "' not found.");
+	    }
+	}
+	
 	
 	
 	
@@ -144,57 +326,71 @@ public class ChatServer implements Runnable{
 	        System.out.println("User " + privateMessage.getReceiver() + " is not online.");
 	    }
 	}
-	
-	private Map<String, List<String>> chatRooms = new ConcurrentHashMap<>();  // Map to store chat rooms and their members
+ 
 
-	private void createChatRoom(ChatMessage roomCreationMessage) {
+ private void createChatRoom(ChatMessage roomCreationMessage) {
 	    String roomName = roomCreationMessage.getRoomName();
 	    String creator = roomCreationMessage.getUser();
 
 	    if (!chatRooms.containsKey(roomName)) {
-	        // Create a new chat room
-	        chatRooms.put(roomName, new ArrayList<>());
-	        chatRooms.get(roomName).add(creator);
+	        Room room = new Room(roomName);
+	        room.addMember(creator);
+	        chatRooms.put(roomName, room);
 
-	        // Notify the creator about the successful creation
 	        sendTextToUser(creator, "You have successfully created the chat room '" + roomName + "'.");
 	        System.out.println(creator + "have successfully created the chat room '" + roomName + "'.");
+	        System.out.println(chatRooms.containsKey(roomName));
+
 	    } else {
-	        // Chat room with the same name already exists
 	        sendTextToUser(creator, "Chat room '" + roomName + "' already exists. Please choose a different name.");
 	        System.out.println(creator + "Chat room '" + roomName + "' already exists. Please choose a different name.");
 	    }
 	}
 
-	private void sendRoomInvitation(ChatMessage invitationMessage) {
-	    String roomName = invitationMessage.getRoomName();
-	    String inviter = invitationMessage.getUser();
-	    String invitee = invitationMessage.getReceiver();
 
-	    if (chatRooms.containsKey(roomName)) {
-	        // Check if the inviter is a member of the chat room
-	        if (chatRooms.get(roomName).contains(inviter)) {
-	            // Send an invitation to the specified user
-	            Connection inviteeConnection = userConnectionMap.get(invitee);
-	            if (inviteeConnection != null && inviteeConnection.isConnected()) {
-	                sendTextToUser(invitee, "You have been invited to join the chat room '" + roomName +
-	                        "' by " + inviter + ". Type '/join " + roomName + "' to join.");
-	                System.out.println(invitee + "You have been invited to join the chat room '" + roomName +
-	                        "' by " + inviter + ". Type '/join " + roomName + "' to join.");
-	                
-	            } else {
-	                sendTextToUser(inviter, "User '" + invitee + "' is not online.");
-	                System.out.println(inviter + "User '" + invitee + "' is not online.");
+ private void sendRoomMessage(Connection sender, ChatMessage roomMessage) {
+	    String roomName = roomMessage.getRoomName();
+	    String userName = connectionUserMap.get(sender);
+        System.out.println(roomName);
+
+	    if (chatRooms.containsKey(roomName) && chatRooms.get(roomName).getMembers().contains(userName)) {
+	    	
+	    	Room room = chatRooms.get(roomName);
+	        room.addMessage(roomMessage);
+	       
+	        List<String> roomMembers = chatRooms.get(roomName).getMembers();
+
+	        for (String member : roomMembers) {
+	            Connection memberConnection = userConnectionMap.get(member);
+	            if (memberConnection != null && memberConnection.isConnected()) {
+	                memberConnection.sendTCP(roomMessage);
 	            }
-	        } else {
-	            sendTextToUser(inviter, "You are not a member of the chat room '" + roomName + "'.");
-	            System.out.println(inviter + "You are not a member of the chat room '" + roomName + "'.");
 	        }
 	    } else {
-	        sendTextToUser(inviter, "Chat room '" + roomName + "' does not exist.");
-            System.out.println(inviter + "Chat room '" + roomName + "' does not exist.");
+	        sender.sendTCP(new InfoMessage("You are not a member of the room '" + roomName + "'."));
 	    }
 	}
+ 
+ 
+ 
+ private void handleGetMoreMessages(ChatMessage getMoreMessagesMessage) {
+	    String roomName = getMoreMessagesMessage.getRoomName();
+	    Connection connection = userConnectionMap.get(getMoreMessagesMessage.getUser());
+
+	    if (chatRooms.containsKey(roomName) && chatRooms.get(roomName).getMembers().contains(getMoreMessagesMessage.getUser())) {
+	        Room room = chatRooms.get(roomName);
+	        List<ChatMessage> lastMessages = room.getLastNMessages(20);
+
+	        for (ChatMessage message : lastMessages) {
+	            connection.sendTCP(message);
+	        }
+	    } else {
+	        connection.sendTCP(new InfoMessage("You are not a member of the room '" + roomName + "'."));
+	    }
+	}
+ 
+ 
+ 
 
 	private void sendTextToUser(String username, String text) {
 	    Connection userConnection = userConnectionMap.get(username);

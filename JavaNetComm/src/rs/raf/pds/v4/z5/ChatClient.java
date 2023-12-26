@@ -3,16 +3,23 @@ package rs.raf.pds.v4.z5;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import com.esotericsoftware.kryonet.Client;
 import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
 
 import rs.raf.pds.v4.z5.messages.ChatMessage;
+import rs.raf.pds.v4.z5.messages.ChatMessage.MessageType;
 import rs.raf.pds.v4.z5.messages.InfoMessage;
 import rs.raf.pds.v4.z5.messages.KryoUtil;
+import rs.raf.pds.v4.z5.messages.ListRoomsUpdate;
 import rs.raf.pds.v4.z5.messages.ListUsers;
 import rs.raf.pds.v4.z5.messages.Login;
+import rs.raf.pds.v4.z5.messages.Room;
 import rs.raf.pds.v4.z5.messages.WhoRequest;
 import javafx.application.Platform;
 import javafx.scene.control.TextArea;
@@ -32,6 +39,9 @@ public class ChatClient implements Runnable{
 	final int portNumber;
 	final String userName;
 	private TextArea chatArea; 
+	private Map<String, Room> chatRooms = new HashMap<>();
+	private Map<String, List<String>> roomInvitations = new HashMap<>();
+
 	
 	public ChatClient(String hostName, int portNumber, String userName) {
 		this.client = new Client(DEFAULT_CLIENT_WRITE_BUFFER_SIZE, DEFAULT_CLIENT_READ_BUFFER_SIZE);
@@ -40,6 +50,10 @@ public class ChatClient implements Runnable{
 		this.portNumber = portNumber;
 		this.userName = userName;
 		KryoUtil.registerKryoClasses(client.getKryo());
+		client.getKryo().register(ListRoomsUpdate.class); 
+        client.getKryo().register(ArrayList.class); 
+
+
 		registerListener();
 	}
 	private void registerListener() {
@@ -95,7 +109,38 @@ public class ChatClient implements Runnable{
 	            createChatRoom(message);
 	        } else if (message.startsWith("/invite")) {
 	            sendRoomInvitation(message);
-	        } else {
+	        } else if (message.startsWith("/join")) {
+	        	joinChatRoom(message);
+	        } else if (message.startsWith("/getmoremessages")) {
+	            String[] commandParts = message.split(" ", 2);
+	            
+                System.out.println(commandParts);
+
+	            
+	            if (commandParts.length == 2) {
+	                String roomName = commandParts[1];
+
+	                ChatMessage getMoreMessagesMessage = new ChatMessage(userName, message);
+	                getMoreMessagesMessage.setMessageType(MessageType.GET_MORE_MESSAGES);
+	                getMoreMessagesMessage.setRoomName(roomName);
+
+	                client.sendTCP(getMoreMessagesMessage);
+	            }
+	        	
+	        }  else if (message.startsWith("/")) {
+	            String[] commandParts = message.split(" ", 2);
+	            if (commandParts.length == 2) {
+	                String roomName = commandParts[0].substring(1);  
+	                String roomMessageText = commandParts[1];
+
+	                ChatMessage roomMessage = new ChatMessage(userName, roomMessageText);
+	                roomMessage.setRoomName(roomName);
+
+	                sendRoomMessage(roomMessage);
+	            } else {
+	                System.out.println("Invalid command format. Use /roomName message");
+	            }
+	        }  else {
 	            ChatMessage chatMessage = new ChatMessage(userName, message);
 	            client.sendTCP(chatMessage);
 		        Platform.runLater(() -> chatArea.appendText(chatMessage.getUser() + ": " + chatMessage.getTxt() + "\n"));
@@ -121,13 +166,19 @@ public class ChatClient implements Runnable{
 	}
 	
 	
-	public void createChatRoom(String message) {
+	void createChatRoom(String message) {
 	    String[] parts = message.split(" ", 2);
 	    if (parts.length == 2) {
+	        String roomName = parts[1];
+	        
+	        Room room = new Room(roomName);
+
+
 	        ChatMessage roomCreationMessage = new ChatMessage(userName, "");
-	        roomCreationMessage.setRoomName(parts[1]);
+	        roomCreationMessage.setRoomName(roomName);
 	        roomCreationMessage.setRoomCreation(true);
 	        client.sendTCP(roomCreationMessage);
+	        System.out.println(roomName);
 	    } else {
 	        System.out.println("Invalid room creation format. Use /create @room_name");
 	    }
@@ -146,11 +197,36 @@ public class ChatClient implements Runnable{
 	    }
 	}
 	
+	public void joinChatRoom(String message) {
+	    String[] parts = message.split(" ", 2);
+	    if (parts.length == 2) {
+	        String roomName = parts[1];
+	        ChatMessage joinRoomMessage = new ChatMessage(userName, "/join " + roomName);
+	        joinRoomMessage.setRoomName(roomName);
+	        System.out.println(roomName);
+
+	        client.sendTCP(joinRoomMessage);
+	    } else {
+	        System.out.println("Invalid join room format. Use /join roomName");
+	        Platform.runLater(() -> chatArea.appendText("Invalid join room format. Use /join roomName"));
+	    }
+	}
 	
 	
 	
+	private void sendRoomMessage(ChatMessage roomMessage) {
+	    if (client.isConnected() && running) {
+	        client.sendTCP(roomMessage);
+	    } else {
+	        System.out.println("Not connected to the server. Cannot send message.");
+	    }
+	}
 	
 	
+	
+	public void sendJoinRoomMessage(ChatMessage joinRoomMessage) {
+	    client.sendTCP(joinRoomMessage);
+	}
 	
 	public void showChatMessage(ChatMessage chatMessage) {
 	    if (chatArea != null) {
