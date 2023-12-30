@@ -13,13 +13,16 @@ public class ChatMessage {
     private boolean roomMessage;
     private boolean isRoomCreation;
     private boolean isInvitation;
+    private ChatMessage MessageRepliedTo = null;
     private MessageType messageType;
 
     
-    public enum MessageType {
+    
+	public enum MessageType {
         REGULAR, 
         GET_MORE_MESSAGES,
-        EDIT
+        EDIT,
+        REPLY 
     }
     
     protected ChatMessage() {
@@ -37,12 +40,31 @@ public class ChatMessage {
         return UUID.fromString(messageId);
     }
     
+    public ChatMessage getMessageRepliedTo() {
+		return MessageRepliedTo;
+	}
+
+	public void setMessageRepliedTo(ChatMessage messageRepliedTo) {
+		MessageRepliedTo = messageRepliedTo;
+	}
  
     public String getUser() {
         return user;
     }
 
-    public String getTxt() {
+    public void setUser(String user) {
+		this.user = user;
+	}
+
+	public void setTxt(String txt) {
+		this.txt = txt;
+	}
+
+	public void setMessageId(String messageId) {
+		this.messageId = messageId;
+	}
+
+	public String getTxt() {
         return txt;
     }
 
@@ -103,11 +125,11 @@ public class ChatMessage {
     public void setMessageType(MessageType messageType) {
         this.messageType = messageType;
     }
-
+    //"Message ID: " + messageId.toString() + "\n"
     @Override
     public String toString() {
         if(user!=null) {
-            return user.toString() + ": " + txt.toString() + "\n";
+        	return user.toString() + ": " + txt.toString() + "\n";
         }
         else {
             return txt.toString() + "\n";

@@ -15,4 +15,9 @@ public class ListRoomsUpdate {
     public List<String> getRooms() {
         return rooms;
     }
+
+	@Override
+	public String toString() {
+		return  "Available rooms:" + rooms ;
+	}
 }

@@ -22,6 +22,7 @@ import rs.raf.pds.v4.z5.messages.Login;
 import rs.raf.pds.v4.z5.messages.Room;
 import rs.raf.pds.v4.z5.messages.WhoRequest;
 import javafx.application.Platform;
+import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
 
 
@@ -39,8 +40,9 @@ public class ChatClient implements Runnable{
 	final int portNumber;
 	final String userName;
 	private TextArea chatArea; 
-	private Map<String, Room> chatRooms = new HashMap<>();
-	private Map<String, List<String>> roomInvitations = new HashMap<>();
+    private List<ChatMessage> messageHistory = new ArrayList<>();
+    private ListView<ChatMessage> chatListView = new ListView<>();
+
 
 	
 	public ChatClient(String hostName, int portNumber, String userName) {
@@ -87,7 +89,16 @@ public class ChatClient implements Runnable{
 					showMessage(message.getUser()+"r:"+message.getTxt());
 					return;
 				}
-			}
+				
+				if (object instanceof ListRoomsUpdate) {
+					ListRoomsUpdate listofRooms = (ListRoomsUpdate)object;
+					
+					messageHistory.add(new ChatMessage(userName, listofRooms.toString()));
+					
+					return;
+					
+				}
+			}	
 			
 			public void disconnected(Connection connection) {
 				
@@ -111,10 +122,15 @@ public class ChatClient implements Runnable{
 	            sendRoomInvitation(message);
 	        } else if (message.startsWith("/join")) {
 	        	joinChatRoom(message);
+	        } else if (message.startsWith("/listrooms")) {
+	        	
+	        	ChatMessage newChatMessage = new ChatMessage(userName, message);	        	
+	        	client.sendTCP(newChatMessage);
+	        	
+	        	
 	        } else if (message.startsWith("/getmoremessages")) {
 	            String[] commandParts = message.split(" ", 2);
 	            
-                System.out.println(commandParts);
 
 	            
 	            if (commandParts.length == 2) {
@@ -135,6 +151,7 @@ public class ChatClient implements Runnable{
 
 	                ChatMessage roomMessage = new ChatMessage(userName, roomMessageText);
 	                roomMessage.setRoomName(roomName);
+	                roomMessage.setRoomMessage(true);
 
 	                sendRoomMessage(roomMessage);
 	            } else {
@@ -144,11 +161,18 @@ public class ChatClient implements Runnable{
 	            ChatMessage chatMessage = new ChatMessage(userName, message);
 	            client.sendTCP(chatMessage);
 		        Platform.runLater(() -> chatArea.appendText(chatMessage.getUser() + ": " + chatMessage.getTxt() + "\n"));
+		        messageHistory.add(chatMessage);
+		        
 	        }
 	    } else {
 	        System.out.println("Not connected to the server. Cannot send message.");
 	    }
 	}
+	
+	
+	
+	
+	
 	
 	public void sendPrivateMessage(String message) {
 	    String[] parts = message.split(" ", 3);
@@ -165,6 +189,7 @@ public class ChatClient implements Runnable{
 	    }
 	}
 	
+	/////////////////////////////////CHAT ROOM/////////////////////////////////////////////
 	
 	void createChatRoom(String message) {
 	    String[] parts = message.split(" ", 2);
@@ -224,6 +249,102 @@ public class ChatClient implements Runnable{
 	
 	
 	
+	
+	 List<ChatMessage> getMessageHistory() {
+	        return messageHistory;
+	    }
+	 
+	 
+	 ///////////////////////EDIT MESSAGE/////////////////////////////
+	 
+	 public void updateEditMessage(ChatMessage editMessage) {
+		    ChatMessage originalMessage = findOriginalMessage(editMessage);
+
+		    if (originalMessage != null && userName.equals(editMessage.getUser())) {
+		        if (originalMessage.getMessageType() == ChatMessage.MessageType.REPLY) {
+		            String editedText = editMessage.getTxt();
+
+		            if (editedText.contains("(Ed)")) {
+		                editedText = editedText.substring(0, editedText.lastIndexOf("(Ed)"));
+		            }
+
+		            editMessage.setTxt(editedText + "\n" + "Replied to:" + originalMessage.getTxt().substring(originalMessage.getTxt().indexOf("Replied to:") + "Replied to:".length()));
+		        }
+		        
+		     
+		        if (!editMessage.getTxt().contains("(Ed)")) {
+		            editMessage.setTxt(editMessage.getTxt() + "\n" + "(Ed)");
+		        }
+
+		        messageHistory.remove(originalMessage);
+		        messageHistory.add(editMessage);
+
+		        System.out.println(messageHistory);
+
+		    } else {
+		        System.out.println("You cannot edit other users' messages!");
+		    }
+		}
+	 
+	private ChatMessage findOriginalMessage(ChatMessage Newmessage) {
+	     for (ChatMessage message : messageHistory) {
+	         if (message.getMessageId().equals(Newmessage.getMessageId())) {
+	             return message;
+	         }
+	     }
+	     return null;
+	 }
+	
+	public void editMessage(ChatMessage editMessage) {
+		if (client.isConnected() && running) {
+	        client.sendTCP(editMessage);
+	    } else {
+	        System.out.println("Not connected to the server. Cannot send message.");
+	    }
+		
+	}
+	//////////////////////////////////REPLY MESSAGE////////////////////////////////////////
+	
+	public void sendReplyMessage(ChatMessage replyMessage, ChatMessage selectedMessage) {
+		//&& userName != selectedMessage.getUser()
+		
+		if (selectedMessage != null) {
+	         // Update the original message text			
+			replyMessage.setTxt(replyMessage.getTxt() + "\n" + "Replied to:" + selectedMessage.getTxt().substring(0, Math.min(selectedMessage.getTxt().length(), 15)));
+	        messageHistory.add(replyMessage);
+
+	         
+	         System.out.println(messageHistory);
+	         
+	     }	
+	     else {
+	    	 
+	    	 System.out.println("You cannot edit other users message!");
+	     }
+	}
+	
+	public void replyMessage(ChatMessage replyMessage, ChatMessage selectedMessage) {
+		
+		if (client.isConnected() && running) {
+	        client.sendTCP(replyMessage);
+	        client.sendTCP(selectedMessage);
+	    } else {
+	        System.out.println("Not connected to the server. Cannot send message.");
+	    }
+		
+	}
+	
+	
+	///////////////////////////////////////////////////////////////////////////////////////
+	
+	
+	
+	public String returnUsername () {
+		
+		return userName;
+		
+	}
+	
 	public void sendJoinRoomMessage(ChatMessage joinRoomMessage) {
 	    client.sendTCP(joinRoomMessage);
 	}
@@ -231,13 +352,15 @@ public class ChatClient implements Runnable{
 	public void showChatMessage(ChatMessage chatMessage) {
 	    if (chatArea != null) {
 	        Platform.runLater(() -> chatArea.appendText(chatMessage.getUser() + ": " + chatMessage.getTxt() + "\n"));
+	        messageHistory.add(chatMessage);
 	    }
 	}
 
 	public void showMessage(String txt) {
-	    if (chatArea != null) {
-	        Platform.runLater(() -> chatArea.appendText(txt + "\n"));
-	    }
+		
+		ChatMessage chatmess= new ChatMessage(userName, txt);
+	    Platform.runLater(() -> chatListView.getItems().add(chatmess));
+	    
 	}
 
 	public void showOnlineUsers(String[] users) {
