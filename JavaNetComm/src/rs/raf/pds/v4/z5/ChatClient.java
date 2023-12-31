@@ -146,10 +146,13 @@ public class ChatClient implements Runnable{
 	        }  else if (message.startsWith("/")) {
 	            String[] commandParts = message.split(" ", 2);
 	            if (commandParts.length == 2) {
+	            	
 	                String roomName = commandParts[0].substring(1);  
 	                String roomMessageText = commandParts[1];
+	                String originalUsername = userName;
+	                String roomUsername = userName + "{"+ roomName +"}";
 
-	                ChatMessage roomMessage = new ChatMessage(userName, roomMessageText);
+	                ChatMessage roomMessage = new ChatMessage(originalUsername, roomUsername, roomMessageText);
 	                roomMessage.setRoomName(roomName);
 	                roomMessage.setRoomMessage(true);
 
@@ -226,7 +229,8 @@ public class ChatClient implements Runnable{
 	    String[] parts = message.split(" ", 2);
 	    if (parts.length == 2) {
 	        String roomName = parts[1];
-	        ChatMessage joinRoomMessage = new ChatMessage(userName, "/join " + roomName);
+	        String roomUsername = userName + "{"+roomName+"}";
+	        ChatMessage joinRoomMessage = new ChatMessage(userName, roomUsername, "/join " + roomName);
 	        joinRoomMessage.setRoomName(roomName);
 	        System.out.println(roomName);
 
@@ -327,7 +331,7 @@ public class ChatClient implements Runnable{
 		
 		if (client.isConnected() && running) {
 	        client.sendTCP(replyMessage);
-	        client.sendTCP(selectedMessage);
+	        //client.sendTCP(selectedMessage);
 	    } else {
 	        System.out.println("Not connected to the server. Cannot send message.");
 	    }

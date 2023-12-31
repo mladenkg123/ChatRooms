@@ -32,7 +32,6 @@ public class ChatServer implements Runnable,Listener{
 	volatile boolean running = false;
 	final Server server;
 	final int portNumber;
-	private TextArea chatArea;  
 	String userName;
 	
 	ConcurrentMap<String, Connection> userConnectionMap = new ConcurrentHashMap<String, Connection>();
@@ -40,7 +39,6 @@ public class ChatServer implements Runnable,Listener{
 
 	private List<ChatMessage> messageHistory = new ArrayList<>();
 	private Map<String, List<ChatMessage>> chatRoomsMessages = new ConcurrentHashMap<>();
-	private Map<String, List<String>> userRooms = new ConcurrentHashMap<>();  
 	Map<String, List<String>> roomInvitations = new HashMap<>();
 	private Map<String, Room> chatRooms = new HashMap<>();
 
@@ -63,7 +61,7 @@ public class ChatServer implements Runnable,Listener{
 				if (object instanceof Login) {
 					Login login = (Login)object;
 					newUserLogged(login, connection);
-					connection.sendTCP(new InfoMessage("Hello "+login.getUserName()));
+					connection.sendTCP(new ChatMessage(login.getUserName(), "Hello To the ChatRooms!"));
 					userName = login.getUserName();
 					try {
 						Thread.sleep(2000);
@@ -92,7 +90,7 @@ public class ChatServer implements Runnable,Listener{
 				    } else if (chatMessage.getMessageType() == MessageType.EDIT) {
 				    		handleEditMessage(connection, chatMessage);
 				    } else if (chatMessage.getMessageType() == MessageType.REPLY) {
-			    		handleReplyMessage(connection, chatMessage,	chatMessage);
+			    		handleReplyMessage(connection, chatMessage);
 				    } else if (chatMessage.getTxt().startsWith("/")) {
 				        sendRoomMessage(connection, chatMessage);
 				    } else if (object instanceof ChatMessage || object instanceof ListRoomsUpdate) {
@@ -103,6 +101,14 @@ public class ChatServer implements Runnable,Listener{
 				        System.out.println(chatMessage.getUser() + ":" + chatMessage.getTxt());
 				        handleChatMessage(chatMessage, connection);
 				    }
+				    
+				    System.out.println("++++++++++++++++++++++++++++++++");
+
+		             System.out.println(messageHistory);
+		             System.out.println(messageHistory.contains(chatMessage));
+
+		             System.out.println("++++++++++++++++++++++++++++++++");
+				    
 				    return;
 				}
 
@@ -130,7 +136,7 @@ public class ChatServer implements Runnable,Listener{
 	
 	
 	private void displayServerMessage(String message) {
-	    System.out.println(message);
+	    //System.out.println(message);
 	}
 	
 	
@@ -180,12 +186,7 @@ public class ChatServer implements Runnable,Listener{
 		}
 
 	
-	
-	
-	
-	
-	
-	
+
 	
 	// Displaying messages on the server side
 	
@@ -201,7 +202,9 @@ public class ChatServer implements Runnable,Listener{
 	    } else {
 	        displayServerMessage(chatMessage.getUser() + ": " + chatMessage.getTxt());
 	    }
-	    addMessageToHistory(chatMessage);
+	    if(chatMessage.getMessageType() != ChatMessage.MessageType.EDIT || chatMessage.getMessageType() != ChatMessage.MessageType.REPLY) {
+	    	addMessageToHistory(chatMessage);
+	    }
 	    broadcastChatMessage(chatMessage, connection);
 	}
 
@@ -227,7 +230,7 @@ public class ChatServer implements Runnable,Listener{
 	        roomList.append(room).append(", ");
 	    }
 	    String rooms = roomList.substring(0, roomList.length() - 2);
-	    sendTextToUser(connectionUserMap.get(connection), rooms);
+	    //sendTextToUser(connectionUserMap.get(connection), rooms);
 
 	    // Send the updated list to the requesting user
 	    connection.sendTCP(new ListRoomsUpdate(new ArrayList<>(chatRooms.keySet())));
@@ -249,11 +252,20 @@ public class ChatServer implements Runnable,Listener{
 	    // Notify the sender about the successful invitation
 	    sendTextToUser(sender, "Invitation to room '" + roomName + "' sent to user " + receiver);
 	    System.out.println("Invitation to room '" + roomName + "' sent to user " + receiver);
+	    
+	    Connection receiverConnection = userConnectionMap.get(receiver);
+	    if (receiverConnection != null && receiverConnection.isConnected()) {
+	        receiverConnection.sendTCP(new ChatMessage(receiver, "You have been invited to join room '" + roomName + "' by user " + sender));
+	    } else {
+	        sendTextToUser(sender, "User " + receiver + " is not online.");
+	    }
+	    
 	}
 
 	private void handleJoinRoom(Connection connection, ChatMessage joinRoomMessage) {
 	    String roomName = joinRoomMessage.getRoomName();
-	    String userName = connectionUserMap.get(connection);
+	    String userName = joinRoomMessage.getOriginalUsername();
+	    String roomUserName = joinRoomMessage.getRoomUsername();
 	    System.out.println("Room '" + roomName);
 	    System.out.println(userName);
 	    
@@ -261,7 +273,7 @@ public class ChatServer implements Runnable,Listener{
 	        if (roomInvitations.containsKey(roomName) && roomInvitations.get(roomName).contains(userName)) {
 	            Room room = chatRooms.get(roomName);
 
-	            room.addMember(userName);
+	            room.addMember(roomUserName);
 
 	            roomInvitations.get(roomName).remove(userName);
 
@@ -270,6 +282,9 @@ public class ChatServer implements Runnable,Listener{
 	            ChatMessage joinMessage = new ChatMessage("Server", userName + " has joined the room.");
 	            joinMessage.setRoomName(roomName);
 	            sendRoomMessage(connection, joinMessage);
+	            
+	            ///////poslednjih 5 poruka/////////
+	            
 	            if (room.getMessages().size() >= 5) {
 	            	List<ChatMessage> lastMessages = room.getLastNMessages(5);
 		            for (ChatMessage message : lastMessages) {
@@ -331,11 +346,15 @@ public class ChatServer implements Runnable,Listener{
 
 
  private void sendRoomMessage(Connection sender, ChatMessage roomMessage) {
-	    String roomName = roomMessage.getRoomName();
-	    String userName = connectionUserMap.get(sender);
-        System.out.println(roomName);
+	 	String roomName = roomMessage.getRoomName();
+	    //String userName = connectionUserMap.get(sender);
+	 	String userName = roomMessage.getRoomUserName();
+	 	String realUsername = roomMessage.getOriginalUsername();
+        System.out.println(roomMessage);
+        
+        
 
-	    if (chatRooms.containsKey(roomName) && chatRooms.get(roomName).getMembers().contains(userName)) {
+	    if (chatRooms.containsKey(roomName) && chatRooms.get(roomName).getMembers().contains(realUsername)) {
 	    	
 	    	Room room = chatRooms.get(roomName);
 	        room.addMessage(roomMessage);
@@ -384,33 +403,49 @@ public class ChatServer implements Runnable,Listener{
      if (originalMessage != null) {
          if (isUserAllowedToEdit(connection, originalMessage)) {
              
-             messageHistory.remove(originalMessage);
-             messageHistory.add(editMessage);
-             
+           
              
              if (originalMessage.isRoomMessage()) {
             	String roomName = originalMessage.getRoomName();
             	Room room = chatRooms.get(roomName);
+            	String roomUsername = originalMessage.getRoomUserName();
+            	editMessage.setRoomUsername(roomUsername);
      	        room.addMessage(editMessage);
              }
              
              
+             //messageHistory.remove(originalMessage);
+
+             //messageHistory.add(editMessage);
+             
+             
              for(ChatMessage message : messageHistory) {
-            	 
+            	 if(message.getMessageId().equals(editMessage.getMessageId())) {
+                     message.setTxt(editMessage.getTxt());
+                     
+                 }
             	 if (message.getMessageRepliedTo() != null ) {
-            		 System.out.println("a");
             		 ChatMessage mess = message.getMessageRepliedTo();
-            		 if (mess.getMessageId().equals(editMessage.getMessageId())) {
-            			 System.out.println("b");
-            			 message.getMessageRepliedTo().setTxt(editMessage.getTxt());
-         
-            		 }
+            		 System.out.println("a");
             		 
+            		 if (mess.getMessageId().equals(editMessage.getMessageId())) {
+            			 
+            			 message.getMessageRepliedTo().setTxt(editMessage.getTxt());
+            			 
+            			 System.out.println("b");
+            			 System.out.println(message.getMessageRepliedTo());
+            		 }   		 
             	 }
+            	 
              }
 
+             System.out.println("-----------------------------");
+
              System.out.println(messageHistory);
-             
+             System.out.println(messageHistory.size());
+
+             System.out.println("-----------------------------");
+
              broadcastChatMessage(editMessage, null);
          } else {
              System.out.println("Cannot edit message. User not allowed.");
@@ -431,10 +466,17 @@ public class ChatServer implements Runnable,Listener{
  
  
  private boolean isUserAllowedToEdit(Connection connection, ChatMessage originalMessage) {
-	   
 	    String senderUsername = originalMessage.getUser();
+	    String senderUsername2 = originalMessage.getOriginalUsername();
 	    
-	    return senderUsername.equals(getUsernameByConnection(connection));
+	    if (senderUsername.equals(getUsernameByConnection(connection)) || 
+	            senderUsername2.equals(getUsernameByConnection(connection))) {
+	            return true;
+	        } else {
+	            return false;
+	        }
+	    	    
+	    	   
 	}
  
  
@@ -446,37 +488,41 @@ public class ChatServer implements Runnable,Listener{
  ////////////////////REPLY MESSAGE///////////////////
  
  
- private void handleReplyMessage(Connection connection, ChatMessage replyMessage, ChatMessage selectedMessage) {
+ private void handleReplyMessage(Connection connection, ChatMessage replyMessage) {
    
     
    
-     if (selectedMessage != null) {
-         // Update the original message text
+    //if (selectedMessage != null) {
+         
+	 // Update the original message text
          //originalMessage.setTxt(editedText);
          
     	 if (replyMessage.isRoomMessage()) {
-         	String roomName = selectedMessage.getRoomName();
+    		String roomName = replyMessage.getRoomName();
          	Room room = chatRooms.get(roomName);
+         	String roomUsername = userName + "{"+room.getName()+"}";
+         	replyMessage.setRoomUsername(roomUsername);
   	        room.addMessage(replyMessage);
           }
     	 
-    	 
          messageHistory.add(replyMessage);
-
-         
-         System.out.println(messageHistory);
+  
+       
          broadcastChatMessage(replyMessage, null);
          
-     }
+     
  }
  
 ////////////////////////////////////////////////////////
+ 
+
 
 	private void sendTextToUser(String username, String text) {
 	    Connection userConnection = userConnectionMap.get(username);
 	    if (userConnection != null && userConnection.isConnected()) {
 	        // Send a text message to the specified user
-	        userConnection.sendTCP(new InfoMessage(text));
+	        userConnection.sendTCP(new ChatMessage(username,text));
+	        
 	    }
 	}
 	
@@ -530,7 +576,6 @@ public class ChatServer implements Runnable,Listener{
 	}
 	
 	private void showTextToAll(String txt, Connection exception) {
-		System.out.println(txt);
 		for (Connection conn: userConnectionMap.values()) {
 			if (conn.isConnected() && conn != exception)
 				conn.sendTCP(new InfoMessage(txt));

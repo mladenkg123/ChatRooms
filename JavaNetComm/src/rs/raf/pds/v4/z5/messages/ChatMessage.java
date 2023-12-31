@@ -15,6 +15,8 @@ public class ChatMessage {
     private boolean isInvitation;
     private ChatMessage MessageRepliedTo = null;
     private MessageType messageType;
+    private String originalUsername; 
+    private String roomUsername;
 
     
     
@@ -36,7 +38,19 @@ public class ChatMessage {
         this.messageId = UUID.randomUUID().toString();
     }
     
+    public ChatMessage(String originalUsername, String roomUsername, String txt) {
+    	this.messageId = UUID.randomUUID().toString();
+    	this.messageType = MessageType.REGULAR;
+    	this.user = originalUsername;
+        this.originalUsername = originalUsername;
+        this.roomUsername = roomUsername;
+        this.txt = txt;
+        
+    }
+
+    
     public UUID getMessageId() {
+    	
         return UUID.fromString(messageId);
     }
     
@@ -125,9 +139,51 @@ public class ChatMessage {
     public void setMessageType(MessageType messageType) {
         this.messageType = messageType;
     }
-    //"Message ID: " + messageId.toString() + "\n"
+    
+    public String getOriginalUsername() {
+        return originalUsername;
+    }
+    
+    public String getRoomUserName() {
+        return roomUsername;
+    }
+    
+    
+    public String getRoomUsername() {
+		return roomUsername;
+	}
+
+	public void setRoomUsername(String roomUsername) {
+		this.roomUsername = roomUsername;
+	}
+
+	public void setOriginalUsername(String originalUsername) {
+		this.originalUsername = originalUsername;
+	}
+	
+	@Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+
+        ChatMessage message = (ChatMessage) obj;
+        return this.getMessageId().equals(message.getMessageId());
+    }
+	
+	
+
+	//"Message ID: " + messageId.toString() + "\n"
     @Override
     public String toString() {
+    	
+    	if (isRoomMessage()) {
+    		return roomUsername + ":" + txt.toString() +"\n";
+    	}
+    	
         if(user!=null) {
         	return user.toString() + ": " + txt.toString() + "\n";
         }
