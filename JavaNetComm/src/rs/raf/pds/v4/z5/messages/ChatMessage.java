@@ -184,6 +184,10 @@ public class ChatMessage {
     		return roomUsername + ":" + txt.toString() +"\n";
     	}
     	
+    	/*if (messageType == MessageType.REPLY) {
+    		return txt  + "Replied To:" + getMessageRepliedTo().getTxt().substring(0, Math.min(getMessageRepliedTo().getTxt().length(), 15));
+    	} */
+    	
         if(user!=null) {
         	return user.toString() + ": " + txt.toString() + "\n";
         }

@@ -2,9 +2,14 @@ package rs.raf.pds.v4.z5;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -32,7 +37,7 @@ public class ChatServer implements Runnable,Listener{
 	volatile boolean running = false;
 	final Server server;
 	final int portNumber;
-	String userName;
+	
 	
 	ConcurrentMap<String, Connection> userConnectionMap = new ConcurrentHashMap<String, Connection>();
 	ConcurrentMap<Connection, String> connectionUserMap = new ConcurrentHashMap<Connection, String>();
@@ -62,7 +67,6 @@ public class ChatServer implements Runnable,Listener{
 					Login login = (Login)object;
 					newUserLogged(login, connection);
 					connection.sendTCP(new ChatMessage(login.getUserName(), "Hello To the ChatRooms!"));
-					userName = login.getUserName();
 					try {
 						Thread.sleep(2000);
 					} catch (InterruptedException e) {
@@ -273,7 +277,7 @@ public class ChatServer implements Runnable,Listener{
 	        if (roomInvitations.containsKey(roomName) && roomInvitations.get(roomName).contains(userName)) {
 	            Room room = chatRooms.get(roomName);
 
-	            room.addMember(roomUserName);
+	            room.addMember(userName);
 
 	            roomInvitations.get(roomName).remove(userName);
 
@@ -360,7 +364,10 @@ public class ChatServer implements Runnable,Listener{
 	        room.addMessage(roomMessage);
 	       
 	        List<String> roomMembers = chatRooms.get(roomName).getMembers();
-
+	        System.out.println("\\\\\\\\\\\\\\\\\\");
+	        System.out.println(roomMembers);
+	        System.out.println(roomMessage);
+	        System.out.println("\\\\\\\\\\\\\\\\\\");
 	        for (String member : roomMembers) {
 	            Connection memberConnection = userConnectionMap.get(member);
 	            if (memberConnection != null && memberConnection.isConnected()) {
@@ -418,26 +425,26 @@ public class ChatServer implements Runnable,Listener{
 
              //messageHistory.add(editMessage);
              
+       
              
-             for(ChatMessage message : messageHistory) {
-            	 if(message.getMessageId().equals(editMessage.getMessageId())) {
-                     message.setTxt(editMessage.getTxt());
-                     
+             if (originalMessage != null) {
+                 if (isUserAllowedToEdit(connection, originalMessage)) {
+                     // Update the original message text
+                     originalMessage.setTxt(editMessage.getTxt());
+
+                     // Update the replied message if there is one
+                     updateRepliedMessage(editMessage);
+
+                     broadcastChatMessage(originalMessage, null);
+                 } else {
+                     System.out.println("Cannot edit message. User not allowed.");
                  }
-            	 if (message.getMessageRepliedTo() != null ) {
-            		 ChatMessage mess = message.getMessageRepliedTo();
-            		 System.out.println("a");
-            		 
-            		 if (mess.getMessageId().equals(editMessage.getMessageId())) {
-            			 
-            			 message.getMessageRepliedTo().setTxt(editMessage.getTxt());
-            			 
-            			 System.out.println("b");
-            			 System.out.println(message.getMessageRepliedTo());
-            		 }   		 
-            	 }
-            	 
+             } else {
+                 System.out.println("Cannot edit message. Original message not found.");
              }
+         
+
+         
 
              System.out.println("-----------------------------");
 
@@ -455,6 +462,27 @@ public class ChatServer implements Runnable,Listener{
      }
  }
 
+ private void updateRepliedMessage(ChatMessage editMessage) {
+	    Queue<ChatMessage> queue = new LinkedList<>();
+
+	    // Add the original message to the queue
+	    queue.add(editMessage);
+
+	    while (!queue.isEmpty()) {
+	        ChatMessage currentMessage = queue.poll();
+
+	        // Check if the current message has a replied message
+	        if (currentMessage.getMessageRepliedTo() != null &&
+	                currentMessage.getMessageRepliedTo().getMessageId().equals(editMessage.getMessageId())) {
+	            // Update the replied message text
+	            currentMessage.getMessageRepliedTo().setTxt(editMessage.getTxt());
+
+	            // Add the replied message to the queue for further processing
+	            queue.add(currentMessage.getMessageRepliedTo());
+	        }
+	    }
+	}
+ 
  private ChatMessage findOriginalMessage(ChatMessage Newmessage) {
      for (ChatMessage message : messageHistory) {
          if (message.getMessageId().equals(Newmessage.getMessageId())) {
@@ -498,9 +526,10 @@ public class ChatServer implements Runnable,Listener{
          //originalMessage.setTxt(editedText);
          
     	 if (replyMessage.isRoomMessage()) {
+    		String username = getUsernameByConnection(connection);
     		String roomName = replyMessage.getRoomName();
          	Room room = chatRooms.get(roomName);
-         	String roomUsername = userName + "{"+room.getName()+"}";
+         	String roomUsername = username + "{"+room.getName()+"}";
          	replyMessage.setRoomUsername(roomUsername);
   	        room.addMessage(replyMessage);
           }
