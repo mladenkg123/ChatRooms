@@ -9,12 +9,17 @@ public class ChatMessage {
     private String receiver;
     private String roomName;
     private String messageId;
+    private String replyId;
     private boolean privateMessage;
     private boolean roomMessage;
     private boolean isRoomCreation;
     private boolean isInvitation;
     private ChatMessage MessageRepliedTo = null;
-    private MessageType messageType;
+    private ChatMessage ReplyMessage = null;
+   
+
+
+	private MessageType messageType;
     private String originalUsername; 
     private String roomUsername;
 
@@ -53,7 +58,15 @@ public class ChatMessage {
     	
         return UUID.fromString(messageId);
     }
-    
+    public String getReplyId() {
+        return replyId;
+    }
+
+    public void setReplyId(String replyId) {
+        this.replyId = replyId;
+    }
+
+
     public ChatMessage getMessageRepliedTo() {
 		return MessageRepliedTo;
 	}
@@ -62,6 +75,14 @@ public class ChatMessage {
 		MessageRepliedTo = messageRepliedTo;
 	}
  
+	public ChatMessage getReplyMessage() {
+		return ReplyMessage;
+	}
+
+	public void setReplyMessage(ChatMessage replyMessage) {
+		ReplyMessage = replyMessage;
+	}
+
     public String getUser() {
         return user;
     }

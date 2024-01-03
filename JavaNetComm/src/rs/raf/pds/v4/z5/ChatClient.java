@@ -279,6 +279,30 @@ public class ChatClient implements Runnable{
 		        if (!editMessage.getTxt().contains("(Ed)")) {
 		            editMessage.setTxt(editMessage.getTxt() + "\n" + "(Ed)");
 		        }
+		        
+		        
+		        
+		        List<ChatMessage> messageHistoryCopy = new ArrayList<>(messageHistory);
+
+	             for (ChatMessage message : messageHistoryCopy) {
+	                 if (message.getMessageType() == ChatMessage.MessageType.REPLY) {
+	                     
+
+	                     ChatMessage message2 = editMessage;
+	                     if (message2 != null && message2.getMessageId().toString().equals(message.getReplyId())) {
+	                         
+	                    	 String newText = message.getTxt().replaceAll("Replied to:.*", "");
+	                    	 String repliedToText = "Replied to:" + message2.getTxt().substring(0, Math.min(message2.getTxt().length(), 15));
+	                    	 message.setTxt(newText + repliedToText);	                     
+	                    	 }
+	                 }
+	             }
+	            	 
+	            	 
+	             messageHistory = new ArrayList<>(messageHistoryCopy);
+		        
+		        
+		        
 
 		        messageHistory.remove(originalMessage);
 		        messageHistory.add(editMessage);
@@ -331,7 +355,7 @@ public class ChatClient implements Runnable{
 		
 		if (client.isConnected() && running) {
 	        client.sendTCP(replyMessage);
-	        //client.sendTCP(selectedMessage);
+	        client.sendTCP(selectedMessage);
 	    } else {
 	        System.out.println("Not connected to the server. Cannot send message.");
 	    }

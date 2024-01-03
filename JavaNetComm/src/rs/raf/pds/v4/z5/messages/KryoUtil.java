@@ -13,5 +13,6 @@ public class KryoUtil {
 		kryo.register(InfoMessage.class);
 		kryo.register(Room.class);
 		kryo.register(ChatMessage.MessageType.class);
+		kryo.register(StringBuffer.class);
 	}
 }

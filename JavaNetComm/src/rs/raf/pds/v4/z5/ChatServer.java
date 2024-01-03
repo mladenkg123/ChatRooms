@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -425,27 +426,30 @@ public class ChatServer implements Runnable,Listener{
 
              //messageHistory.add(editMessage);
              
-       
-             
-             if (originalMessage != null) {
-                 if (isUserAllowedToEdit(connection, originalMessage)) {
-                     // Update the original message text
-                     originalMessage.setTxt(editMessage.getTxt());
 
-                     // Update the replied message if there is one
-                     updateRepliedMessage(editMessage);
+             List<ChatMessage> messageHistoryCopy = new ArrayList<>(messageHistory);
 
-                     broadcastChatMessage(originalMessage, null);
-                 } else {
-                     System.out.println("Cannot edit message. User not allowed.");
+             for (ChatMessage message : messageHistoryCopy) {
+                 if (message.getMessageType() == ChatMessage.MessageType.REPLY) {
+                     
+
+                     // Modify replyMessage as needed
+                     ChatMessage message2 = editMessage;
+                     if (message2 != null && message2.getMessageId().toString().equals(message.getReplyId())) {
+                    	 
+                    	 String newText = message.getTxt().replaceAll("Replied to:.*", "");
+                    	 String repliedToText = "Replied to:" + message2.getTxt().substring(0, Math.min(message2.getTxt().length(), 15));
+                    	 message.setTxt(newText + repliedToText);
+                    	 broadcastChatMessage(message, null);
+                     }
                  }
-             } else {
-                 System.out.println("Cannot edit message. Original message not found.");
              }
-         
+            	 
+            	 
+             messageHistory = new ArrayList<>(messageHistoryCopy);
 
-         
-
+            	     
+             messageHistory.add(editMessage);
              System.out.println("-----------------------------");
 
              System.out.println(messageHistory);
@@ -454,6 +458,7 @@ public class ChatServer implements Runnable,Listener{
              System.out.println("-----------------------------");
 
              broadcastChatMessage(editMessage, null);
+             
          } else {
              System.out.println("Cannot edit message. User not allowed.");
          }
@@ -461,27 +466,6 @@ public class ChatServer implements Runnable,Listener{
          System.out.println("Cannot edit message. Original message not found.");
      }
  }
-
- private void updateRepliedMessage(ChatMessage editMessage) {
-	    Queue<ChatMessage> queue = new LinkedList<>();
-
-	    // Add the original message to the queue
-	    queue.add(editMessage);
-
-	    while (!queue.isEmpty()) {
-	        ChatMessage currentMessage = queue.poll();
-
-	        // Check if the current message has a replied message
-	        if (currentMessage.getMessageRepliedTo() != null &&
-	                currentMessage.getMessageRepliedTo().getMessageId().equals(editMessage.getMessageId())) {
-	            // Update the replied message text
-	            currentMessage.getMessageRepliedTo().setTxt(editMessage.getTxt());
-
-	            // Add the replied message to the queue for further processing
-	            queue.add(currentMessage.getMessageRepliedTo());
-	        }
-	    }
-	}
  
  private ChatMessage findOriginalMessage(ChatMessage Newmessage) {
      for (ChatMessage message : messageHistory) {
@@ -491,8 +475,7 @@ public class ChatServer implements Runnable,Listener{
      }
      return null;
  }
- 
- 
+
  private boolean isUserAllowedToEdit(Connection connection, ChatMessage originalMessage) {
 	    String senderUsername = originalMessage.getUser();
 	    String senderUsername2 = originalMessage.getOriginalUsername();

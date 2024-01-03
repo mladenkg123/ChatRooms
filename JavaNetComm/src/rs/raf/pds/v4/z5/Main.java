@@ -284,6 +284,8 @@ public class Main extends Application {
                 replyMessage.setReceiver(selectedMessage.getUser());
                 replyMessage.setRoomMessage(selectedMessage.isRoomMessage());
                 replyMessage.setMessageRepliedTo(selectedMessage);
+                //replyMessage.setReplyMessage(replyMessage);
+                replyMessage.setReplyId(selectedMessage.getMessageId().toString());
                 
                 sendReplyMessageToClient(replyMessage, selectedMessage);
                 sendReplyMessageToServer(replyMessage, selectedMessage);
