@@ -172,7 +172,7 @@ public class Main extends Application {
             // Retrieve the original message from the GUI or your data structure
         	ChatMessage originalMessage = chatListView.getSelectionModel().getSelectedItem();
 
-            if (originalMessage != null) {
+            if (originalMessage != null && originalMessage.getUser().equals(chatClient.userName)) {
                 // Prompt the user for the edited message
                 String editedText = promptUserForEdit();
 
@@ -240,15 +240,6 @@ public class Main extends Application {
     }
 
 
-    private ChatMessage createEditMessage(String messageId, String editedMessage) {
-        // Create an EDIT type ChatMessage
-        ChatMessage editMessage = new ChatMessage("user", editedMessage);
-        editMessage.setMessageType(ChatMessage.MessageType.EDIT);
-        editMessage.setMessageId(messageId);
-
-        return editMessage;
-    }
-    
     
     private void sendEditMessageToClient(ChatMessage editMessage) {
     	if (chatClient != null) {

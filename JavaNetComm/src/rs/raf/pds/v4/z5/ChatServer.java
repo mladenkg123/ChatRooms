@@ -27,6 +27,7 @@ import rs.raf.pds.v4.z5.messages.InfoMessage;
 import rs.raf.pds.v4.z5.messages.KryoUtil;
 import rs.raf.pds.v4.z5.messages.ListUsers;
 import rs.raf.pds.v4.z5.messages.Login;
+import rs.raf.pds.v4.z5.messages.PrivateConversationManager;
 import rs.raf.pds.v4.z5.messages.Room;
 import rs.raf.pds.v4.z5.messages.WhoRequest;
 import rs.raf.pds.v4.z5.messages.ListRoomsUpdate;
@@ -47,6 +48,8 @@ public class ChatServer implements Runnable,Listener{
 	private Map<String, List<ChatMessage>> chatRoomsMessages = new ConcurrentHashMap<>();
 	Map<String, List<String>> roomInvitations = new HashMap<>();
 	private Map<String, Room> chatRooms = new HashMap<>();
+	
+	PrivateConversationManager pcm = new PrivateConversationManager();
 
 	
 	
@@ -83,8 +86,6 @@ public class ChatServer implements Runnable,Listener{
 				        createChatRoom(chatMessage);
 				    } else if (chatMessage.isInvitation()) {
 				    	handleRoomInvitation(connection, chatMessage);
-				    } else if (chatMessage.isPrivateMessage()) {
-				        sendPrivateMessage(chatMessage);
 				    } else if (chatMessage.getTxt().startsWith("/join")) {
 				    	handleJoinRoom(connection, chatMessage);
 				    } else if (chatMessage.getTxt().startsWith("/listrooms")) {
@@ -93,9 +94,12 @@ public class ChatServer implements Runnable,Listener{
 					        handleGetMoreMessages(chatMessage);
 					        return;    
 				    } else if (chatMessage.getMessageType() == MessageType.EDIT) {
+				    	 	System.out.println("aaa");
 				    		handleEditMessage(connection, chatMessage);
 				    } else if (chatMessage.getMessageType() == MessageType.REPLY) {
 			    		handleReplyMessage(connection, chatMessage);
+				    } else if (chatMessage.isPrivateMessage()) {
+				        sendPrivateMessage(connection, chatMessage);
 				    } else if (chatMessage.getTxt().startsWith("/")) {
 				        sendRoomMessage(connection, chatMessage);
 				    } else if (object instanceof ChatMessage || object instanceof ListRoomsUpdate) {
@@ -106,13 +110,6 @@ public class ChatServer implements Runnable,Listener{
 				        System.out.println(chatMessage.getUser() + ":" + chatMessage.getTxt());
 				        handleChatMessage(chatMessage, connection);
 				    }
-				    
-				    System.out.println("++++++++++++++++++++++++++++++++");
-
-		             System.out.println(messageHistory);
-		             System.out.println(messageHistory.contains(chatMessage));
-
-		             System.out.println("++++++++++++++++++++++++++++++++");
 				    
 				    return;
 				}
@@ -315,13 +312,23 @@ public class ChatServer implements Runnable,Listener{
 
 	
 	
- void sendPrivateMessage(ChatMessage privateMessage) {
+ void sendPrivateMessage(Connection connection, ChatMessage privateMessage) {
 	    Connection receiverConnection = userConnectionMap.get(privateMessage.getReceiver());
 	    Connection senderConnection = userConnectionMap.get(privateMessage.getUser());
+	    
+	    String sender = privateMessage.getUser();
 	    String receiver = privateMessage.getReceiver();
+	    
+	    
+	    pcm.startPrivateConversation(sender, receiver);
+	   
 	    if (receiverConnection != null && receiverConnection.isConnected()) {
 	        receiverConnection.sendTCP(privateMessage);
 	        senderConnection.sendTCP(privateMessage);
+	        System.out.println("++++++++++++++++");	        
+	        System.out.println(privateMessage.getMessageType());
+	        System.out.println("++++++++++++++++");
+	        messageHistory.add(privateMessage);
 	        System.out.println("User   " + privateMessage.getUser() + "sent private message :  " + privateMessage.getTxt() + "to user :  " + privateMessage.getReceiver());
 	    } else {
 	        senderConnection.sendTCP(new InfoMessage("User " + receiver + " is not online."));
@@ -406,12 +413,10 @@ public class ChatServer implements Runnable,Listener{
  private void handleEditMessage(Connection connection, ChatMessage editMessage) {
    
      ChatMessage originalMessage = findOriginalMessage(editMessage);
-     System.out.println(originalMessage);
-   
+    
      if (originalMessage != null) {
          if (isUserAllowedToEdit(connection, originalMessage)) {
              
-           
              
              if (originalMessage.isRoomMessage()) {
             	String roomName = originalMessage.getRoomName();
@@ -420,16 +425,15 @@ public class ChatServer implements Runnable,Listener{
             	editMessage.setRoomUsername(roomUsername);
      	        room.addMessage(editMessage);
              }
-             
-             
+                         
              //messageHistory.remove(originalMessage);
 
-             //messageHistory.add(editMessage);
-             
-
+             //messageHistory.add(editMessage);             
              List<ChatMessage> messageHistoryCopy = new ArrayList<>(messageHistory);
 
              for (ChatMessage message : messageHistoryCopy) {
+                 
+
                  if (message.getMessageType() == ChatMessage.MessageType.REPLY) {
                      
 
@@ -440,7 +444,9 @@ public class ChatServer implements Runnable,Listener{
                     	 String newText = message.getTxt().replaceAll("Replied to:.*", "");
                     	 String repliedToText = "Replied to:" + message2.getTxt().substring(0, Math.min(message2.getTxt().length(), 15));
                     	 message.setTxt(newText + repliedToText);
-                    	 broadcastChatMessage(message, null);
+                    	
+                    	broadcastChatMessage(message, null);
+                    	
                      }
                  }
              }
@@ -448,16 +454,15 @@ public class ChatServer implements Runnable,Listener{
             	 
              messageHistory = new ArrayList<>(messageHistoryCopy);
 
-            	     
              messageHistory.add(editMessage);
              System.out.println("-----------------------------");
-
              System.out.println(messageHistory);
              System.out.println(messageHistory.size());
-
              System.out.println("-----------------------------");
-
-             broadcastChatMessage(editMessage, null);
+             
+            
+        	 broadcastChatMessage(editMessage, null);
+        	     
              
          } else {
              System.out.println("Cannot edit message. User not allowed.");
@@ -479,9 +484,12 @@ public class ChatServer implements Runnable,Listener{
  private boolean isUserAllowedToEdit(Connection connection, ChatMessage originalMessage) {
 	    String senderUsername = originalMessage.getUser();
 	    String senderUsername2 = originalMessage.getOriginalUsername();
-	    
-	    if (senderUsername.equals(getUsernameByConnection(connection)) || 
-	            senderUsername2.equals(getUsernameByConnection(connection))) {
+	    System.out.println("*******************");
+	    System.out.println(senderUsername);
+	    System.out.println(senderUsername2);
+	    System.out.println(getUsernameByConnection(connection));
+	    System.out.println("*******************");
+	    if ((senderUsername != null && senderUsername.equals(getUsernameByConnection(connection))) || (senderUsername2 != null && senderUsername2.equals(getUsernameByConnection(connection)))) {
 	            return true;
 	        } else {
 	            return false;
@@ -519,7 +527,7 @@ public class ChatServer implements Runnable,Listener{
     	 
          messageHistory.add(replyMessage);
   
-       
+         //Da se promeni da vide samo oni u private message-u 
          broadcastChatMessage(replyMessage, null);
          
      
@@ -534,6 +542,15 @@ public class ChatServer implements Runnable,Listener{
 	    if (userConnection != null && userConnection.isConnected()) {
 	        // Send a text message to the specified user
 	        userConnection.sendTCP(new ChatMessage(username,text));
+	        
+	    }
+	}
+	private void sendPrivateTextToUser(String username, ChatMessage privateMessage) {
+	    Connection userConnection = userConnectionMap.get(username);
+	    
+	    if (userConnection != null && userConnection.isConnected()) {
+	       
+	        userConnection.sendTCP(privateMessage);
 	        
 	    }
 	}
@@ -563,7 +580,36 @@ public class ChatServer implements Runnable,Listener{
 		showTextToAll("User "+loginMessage.getUserName()+" has connected!", conn);
 	}
 	private void broadcastChatMessage(ChatMessage message, Connection exception) {
-		if (message.isRoomMessage()) {
+		
+		if (message.isPrivateMessage()) {
+			
+			String sender = message.getUser();
+			String reciever = message.getReceiver();
+			String conversationId = sender + "_" + reciever;
+			String conversationId2 = reciever + "_" + sender;
+			String[] conversationParticipants = pcm.getConversationParticipants(conversationId);
+				
+			if (conversationParticipants == null) {
+				conversationParticipants = pcm.getConversationParticipants(conversationId2);
+			}
+	
+			if (conversationParticipants != null && conversationParticipants.length == 2) {
+			    System.out.println(conversationParticipants[0]);
+			    System.out.println(conversationParticipants[1]);
+
+			    Connection senderConnection = userConnectionMap.get(conversationParticipants[0]);
+			    Connection receiverConnection = userConnectionMap.get(conversationParticipants[1]);
+
+			    if (senderConnection != null && senderConnection.isConnected()) {
+			        senderConnection.sendTCP(message);
+			    }
+
+			    if (receiverConnection != null && receiverConnection.isConnected()) {
+			        receiverConnection.sendTCP(message);
+			    }
+			    return;
+	        }
+	    } else if (message.isRoomMessage()) {
 	        String roomName = message.getRoomName();
 	        Room room = chatRooms.get(roomName);
 
@@ -578,13 +624,16 @@ public class ChatServer implements Runnable,Listener{
 	            }
 	            return;
 	        }
+	    } else {
+	    	
+	    	   for (Connection conn : userConnectionMap.values()) {
+	   	        if (conn.isConnected() && conn != exception) {
+	   	            conn.sendTCP(message);
+	   	        }
+	   	    }
+	    	
 	    }
-
-	    for (Connection conn : userConnectionMap.values()) {
-	        if (conn.isConnected() && conn != exception) {
-	            conn.sendTCP(message);
-	        }
-	    }
+	
 	}
 	
 	private void showTextToAll(String txt, Connection exception) {

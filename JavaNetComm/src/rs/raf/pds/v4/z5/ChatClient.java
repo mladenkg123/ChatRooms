@@ -263,7 +263,7 @@ public class ChatClient implements Runnable{
 	 
 	 public void updateEditMessage(ChatMessage editMessage) {
 		    ChatMessage originalMessage = findOriginalMessage(editMessage);
-
+		    System.out.println(editMessage.getMessageType());
 		    if (originalMessage != null && userName.equals(editMessage.getUser())) {
 		        if (originalMessage.getMessageType() == ChatMessage.MessageType.REPLY) {
 		            String editedText = editMessage.getTxt();
