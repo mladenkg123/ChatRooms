@@ -445,7 +445,7 @@ public class ChatServer implements Runnable,Listener{
                     	 String repliedToText = "Replied to:" + message2.getTxt().substring(0, Math.min(message2.getTxt().length(), 15));
                     	 message.setTxt(newText + repliedToText);
                     	
-                    	broadcastChatMessage(message, null);
+                    	 broadcastChatMessage(message, null);
                     	
                      }
                  }

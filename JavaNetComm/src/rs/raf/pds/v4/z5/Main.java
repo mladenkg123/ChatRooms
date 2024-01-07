@@ -31,78 +31,102 @@ public class Main extends Application {
     private ChatServer chatServer;
     volatile boolean running = true;
     private ListView<ChatMessage> chatListView = new ListView<>();
-    
+    Stage primaryStage;
+    Alert alert = new Alert(Alert.AlertType.WARNING);
+    String userName;
+    String host = "localhost";
+    int port = 9000;
+
+   
     
     @Override
     public void start(Stage primaryStage) {
-        // Create UI components
     	
-  
+    	this.primaryStage = primaryStage;
+    	
+    	BorderPane rootUserGUI = new BorderPane();
+        TextField inputUsernameField = new TextField();
+        Button joinButton = new Button("Join");
+
+          
+        rootUserGUI.setCenter(inputUsernameField);
+        rootUserGUI.setBottom(joinButton);
+
+       
+        Scene usernameSelectionScene = new Scene(rootUserGUI, 300, 150);
+        primaryStage.setScene(usernameSelectionScene);
+        primaryStage.setTitle("Username Selection");
+        primaryStage.show();
+
+        joinButton.setOnAction(event -> {
+            userName = inputUsernameField.getText().trim();
+            if (!userName.isEmpty()) {
+                
+                primaryStage.close();
+                startChatClient();
+            } else {
+            	alert.setTitle("Warning");
+            	alert.setHeaderText(null);
+            	alert.setContentText("Username cannot be empty!");
+            	alert.showAndWait();
+            }
+        });
+    }
+    	
+    	
+    private void startChatClient() {
+        // Create UI components for the Chat Client GUI
         BorderPane root = new BorderPane();
         chatArea = new TextArea();
         inputField = new TextField();
         Button sendButton = new Button("Send");
 
-        
         root.setStyle("-fx-background-color: black; -fx-text-fill: white;");
         chatListView.setStyle("-fx-control-inner-background: black;");
         inputField.setStyle("-fx-control-inner-background: black; -fx-text-fill: white;");
         sendButton.setStyle("-fx-background-color: darkgrey; -fx-text-fill: black;");
-        
-        // Set up the layout
+
+        // Set up the layout for the Chat Client GUI
         root.setCenter(chatListView);
         root.setBottom(inputField);
         root.setRight(sendButton);
-        
-    
-         String hostName = getParameters().getRaw().get(0);
-        int portNumber = Integer.parseInt(getParameters().getRaw().get(1));
-        String userName = getParameters().getRaw().get(2);
 
-        chatClient = new ChatClient(hostName, portNumber, userName);
+        
+        chatClient = new ChatClient(host, port, userName);
         chatClient.setChatArea(chatArea);
-        chatServer = new ChatServer(portNumber);
+        chatServer = new ChatServer(port);
 
-        
-        
         // Set up the action for the send button
         sendButton.setOnAction(event -> sendMessage());
 
         inputField.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.getCode() == KeyCode.ENTER) {
-                event.consume(); 
+                event.consume();
                 sendMessage();
             }
         });
-        
-        
-          
+
         setContextMenu();
 
-        
-        
         // Create the scene and set it to the stage
-        Scene scene = new Scene(root, 600, 450);
-        primaryStage.setScene(scene);
+        Scene chatScene = new Scene(root, 600, 450);
+        primaryStage.setScene(chatScene);
         primaryStage.setTitle("Chat Client");
         primaryStage.setOnCloseRequest(event -> stopChatClient());
         primaryStage.show();
 
         // Display the message history
-       // displayMessageHistory();
-        
-       // setContextMenu();
-       
+        displayMessageHistory();
+
         chatListView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue != null) {
                 // Enable/disable context menu items based on the selection
                 updateContextMenu(newValue);
             }
         });
-        
 
         new Thread(() -> {
-            try {	
+            try {
                 chatClient.start();
                 while (running) {
                     displayMessageHistory();
@@ -352,4 +376,6 @@ public class Main extends Application {
     public static void main(String[] args) {
         launch(args);
     }
+
+
 }
