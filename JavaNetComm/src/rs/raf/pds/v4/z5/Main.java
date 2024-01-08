@@ -75,7 +75,6 @@ public class Main extends Application {
     	
     	
     private void startChatClient() {
-        // Create UI components for the Chat Client GUI
         BorderPane root = new BorderPane();
         chatArea = new TextArea();
         inputField = new TextField();
@@ -86,7 +85,6 @@ public class Main extends Application {
         inputField.setStyle("-fx-control-inner-background: black; -fx-text-fill: white;");
         sendButton.setStyle("-fx-background-color: darkgrey; -fx-text-fill: black;");
 
-        // Set up the layout for the Chat Client GUI
         root.setCenter(chatListView);
         root.setBottom(inputField);
         root.setRight(sendButton);
@@ -96,7 +94,6 @@ public class Main extends Application {
         chatClient.setChatArea(chatArea);
         chatServer = new ChatServer(port);
 
-        // Set up the action for the send button
         sendButton.setOnAction(event -> sendMessage());
 
         inputField.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
@@ -108,19 +105,16 @@ public class Main extends Application {
 
         setContextMenu();
 
-        // Create the scene and set it to the stage
         Scene chatScene = new Scene(root, 600, 450);
         primaryStage.setScene(chatScene);
         primaryStage.setTitle("Chat Client");
         primaryStage.setOnCloseRequest(event -> stopChatClient());
         primaryStage.show();
 
-        // Display the message history
         displayMessageHistory();
 
         chatListView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue != null) {
-                // Enable/disable context menu items based on the selection
                 updateContextMenu(newValue);
             }
         });
@@ -130,7 +124,7 @@ public class Main extends Application {
                 chatClient.start();
                 while (running) {
                     displayMessageHistory();
-                    Thread.sleep(3000); // Adjust the sleep duration as needed
+                    Thread.sleep(3000); 
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -179,13 +173,12 @@ public class Main extends Application {
     }
     
     private void updateContextMenu(ChatMessage selectedMessage) {
-        // Enable/disable context menu items based on the selected message
         if (selectedMessage != null) {
-            chatListView.getContextMenu().getItems().get(0).setDisable(false);// Enable "Edit" menu item
-            chatListView.getContextMenu().getItems().get(1).setDisable(false);// Enable "Reply" menu item
+            chatListView.getContextMenu().getItems().get(0).setDisable(false);
+            chatListView.getContextMenu().getItems().get(1).setDisable(false);
         } else {
-            chatListView.getContextMenu().getItems().get(0).setDisable(true);// Enable "Edit" menu item
-            chatListView.getContextMenu().getItems().get(1).setDisable(true);// Disable "Reply" menu item
+            chatListView.getContextMenu().getItems().get(0).setDisable(true);
+            chatListView.getContextMenu().getItems().get(1).setDisable(true);
         }
     }
 
@@ -193,15 +186,12 @@ public class Main extends Application {
     
    private void handleEditAction() {
        
-            // Retrieve the original message from the GUI or your data structure
         	ChatMessage originalMessage = chatListView.getSelectionModel().getSelectedItem();
 
             if (originalMessage != null && originalMessage.getUser().equals(chatClient.userName)) {
-                // Prompt the user for the edited message
                 String editedText = promptUserForEdit();
 
                 if (editedText != null) {
-                    // Create a new edited message
                     ChatMessage editedMessage = new ChatMessage(originalMessage.getUser(), editedText);
                     editedMessage.setRoomName(originalMessage.getRoomName());
                     editedMessage.setMessageType(ChatMessage.MessageType.EDIT);
@@ -212,7 +202,6 @@ public class Main extends Application {
                     
                     System.out.println(originalMessage.isRoomMessage());
                     System.out.println(editedMessage.isRoomMessage());
-                    // Send the edited message to the server
                     
                     
                     sendEditMessageToClient(editedMessage);
@@ -220,31 +209,24 @@ public class Main extends Application {
                     sendEditMessageToServer(editedMessage);
                    
 
-                    // Update the GUI to display the edited message
                     
                     updateMessageInUI(originalMessage, editedMessage);
                 } else {
-                    // User canceled the edit operation
                 }
             } else {
-                // Unable to find the original message
             }
         } 
    
    private void updateMessageInUI(ChatMessage originalMessage, ChatMessage editedMessage) {
 	    Platform.runLater(() -> {
-	        // Get the index of the original message in the ListView
 	        int index = chatListView.getItems().indexOf(originalMessage);
 
 	        if (index != -1) {
-	            // Update the original message with the edited message	   
 	            chatListView.getItems().set(index, editedMessage);
 	            
-	            // Optionally, you can also select the edited message in the ListView
 	            chatListView.getSelectionModel().select(index);
 	        } else {
 	            System.out.println("Original message not found in the ListView.");
-	            // Handle the case where the original message is not found in the ListView
 	        }
 	    });
 	}
@@ -256,10 +238,8 @@ public class Main extends Application {
         dialog.setHeaderText(null);
         dialog.setContentText("Enter the new message:");
 
-        // Show the dialog and wait for the user's response
         Optional<String> result = dialog.showAndWait();
         
-        // If the user entered a new message, return it
         return result.map(String::trim).orElse(null);
     }
 
@@ -345,7 +325,6 @@ public class Main extends Application {
             for (ChatMessage newMessage : messageHistory) {
                 int existingIndex = -1;
 
-                // Check if the message is already in the ListView
                 for (int i = 0; i < chatListView.getItems().size(); i++) {
                     ChatMessage existingMessage = chatListView.getItems().get(i);
                     if (existingMessage.getMessageId().equals(newMessage.getMessageId())) {
@@ -355,10 +334,8 @@ public class Main extends Application {
                 }
 
                 if (existingIndex != -1) {
-                    // If the message is already in the ListView, update it
                     chatListView.getItems().set(existingIndex, newMessage);
                 } else {
-                    // If the message is not in the ListView, add it
                     chatListView.getItems().add(newMessage);
                 }
             }

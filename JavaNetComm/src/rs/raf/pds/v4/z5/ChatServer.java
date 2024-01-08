@@ -413,7 +413,7 @@ public class ChatServer implements Runnable,Listener{
  private void handleEditMessage(Connection connection, ChatMessage editMessage) {
    
      ChatMessage originalMessage = findOriginalMessage(editMessage);
-    
+     System.out.println(editMessage.getMessageType());
      if (originalMessage != null) {
          if (isUserAllowedToEdit(connection, originalMessage)) {
              
@@ -425,7 +425,30 @@ public class ChatServer implements Runnable,Listener{
             	editMessage.setRoomUsername(roomUsername);
      	        room.addMessage(editMessage);
              }
-                         
+                      
+             
+             if (originalMessage.getReplyId() != null) {
+            	 
+            	 
+            	 int startIndex = originalMessage.getTxt().indexOf("Replied to:");
+            	 String repliedToText = "";
+                 if (startIndex != -1) {
+                     String extractedString = originalMessage.getTxt().substring(startIndex, originalMessage.getTxt().length());
+                     repliedToText = extractedString;          
+                 } else {
+                     System.out.println("Substring not found");
+                 }
+            	 
+                 int repliedToIndex = editMessage.getTxt().indexOf("Replied to");
+                 
+                 String newText = editMessage.getTxt().substring(0, repliedToIndex);
+            	 
+            	 editMessage.setTxt(newText + repliedToText);
+            	          
+            	 broadcastChatMessage(editMessage, null);
+            	 
+             }
+             
              //messageHistory.remove(originalMessage);
 
              //messageHistory.add(editMessage);             
@@ -437,7 +460,6 @@ public class ChatServer implements Runnable,Listener{
                  if (message.getMessageType() == ChatMessage.MessageType.REPLY) {
                      
 
-                     // Modify replyMessage as needed
                      ChatMessage message2 = editMessage;
                      if (message2 != null && message2.getMessageId().toString().equals(message.getReplyId())) {
                     	 
