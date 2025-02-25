@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project demonstrates various network communication patterns in Java, including TCP sockets, UDP communication, and a multi-user chat application using KryoNet.
+This project demonstrates various network communication patterns in Java, including TCP sockets and a multi-user chat application using KryoNet.
 
 ## Project Structure
 
@@ -10,8 +10,7 @@ The project contains several distinct implementations:
 
 1. Simple Socket Communication
 2. Multi-threaded Socket Server
-3. UDP Socket Communication
-4. Advanced Chat System
+3. Advanced Chat System
 
 ## Requirements
 
@@ -29,14 +28,7 @@ Basic TCP socket implementation with:
 - Server: Echoes back client messages
 - Client: Sends messages to server and displays responses
 
-### 2. UDP Communication
-
-Implements UDP socket communication:
-
-- Client: Sends datagram packets and receives responses
-- Server: Generates random numbers and responds to client requests
-
-### 3. Chat Application
+### 2. Chat Application
 
 Advanced chat system featuring:
 
@@ -70,18 +62,11 @@ Advanced chat system featuring:
 java -jar ProstSocketServer.jar <port_number>
 ```
 
-### UDP Server
-
-```bash
-java -jar serverUDPSocket.jar <port_number>
-```
-
 Recommended port: 4443
 
 ## Features
 
 - TCP/IP communication
-- UDP datagram packets
 - Multi-threading support
 - GUI-based chat interface
 - Private messaging system
