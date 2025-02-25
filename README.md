@@ -1,87 +1,122 @@
-# Java Network Communication Project
+# Java Network Chat Project
 
 ## Overview
 
-This project demonstrates various network communication patterns in Java, including TCP sockets and a multi-user chat application using KryoNet.
+A sophisticated Java-based network communication system featuring a multi-user chat application built with KryoNet and JavaFX. The project demonstrates advanced networking patterns, real-time messaging, and graphical user interface implementation.
 
-## Project Structure
+## Features
 
-The project contains several distinct implementations:
+- TCP/IP-based communication
+- Multi-user chat support
+- Private messaging system
+- Chat room management
+- Real-time message delivery
+- JavaFX-based GUI interface
+- Message history tracking
+- User presence management
+- Room invitations system
 
-1. Simple Socket Communication
-2. Multi-threaded Socket Server
-3. Advanced Chat System
+## Technical Stack
 
-## Requirements
-
-- Java 11 or higher
+- Java 11+
 - JavaFX 17
 - KryoNet 2.22.9
 - Eclipse IDE (recommended)
 
-## Components
+## Project Structure
 
-### 1. Simple Socket Communication
+The project consists of several key components:
 
-Basic TCP socket implementation with:
+### Core Components
 
-- Server: Echoes back client messages
-- Client: Sends messages to server and displays responses
+1. **ChatServer**: Handles all server-side operations including:
 
-### 2. Chat Application
+   - User connection management
+   - Message broadcasting
+   - Chat room administration
+   - Private conversation handling
 
-Advanced chat system featuring:
+2. **ChatClient**: Manages client-side functionality:
 
-- Multi-user support
-- Private messaging
-- Chat rooms
-- Message history
-- JavaFX GUI
+   - Server connection
+   - Message sending/receiving
+   - GUI interaction
+   - User input processing
 
-## Running the Applications
+3. **Message System**: Implements various message types for different chat functionalities
 
-### Chat Application
+## Setup and Installation
 
-1. Start the server:
+### Prerequisites
+
+1. Java 11 or higher
+2. JavaFX 17 SDK
+3. KryoNet 2.22.9
+4. Eclipse IDE (recommended)
+
+### Running the Application
+
+1. **Start the Server**:
 
    ```bash
    java -jar chatServer.jar <port_number>
    ```
 
-   Recommended port: 54555
+   Default recommended port: 54555
 
-2. Start the client:
+2. **Launch the Client**:
 
    ```bash
    java --module-path "<path-to-javafx-lib>" --add-modules javafx.controls,javafx.fxml -cp "lib/kryonet-2.22.9.main.jar;main.jar;chatClient.jar;chatServer.jar" rs.raf.pds.v4.z5.Main <hostname> <port> <username>
    ```
 
-### Simple Socket Server
+## Architecture
 
-```bash
-java -jar ProstSocketServer.jar <port_number>
-```
+### Server Architecture
 
-Recommended port: 4443
+- Concurrent user management using ConcurrentHashMap
+- Thread-safe message handling
+- Room management system
+- Private conversation support
 
-## Features
+### Client Architecture
 
-- TCP/IP communication
-- Multi-threading support
-- GUI-based chat interface
-- Private messaging system
-- Chat room management
-- Real-time message delivery
-- Connection management
-- Error handling
+- JavaFX-based GUI
+- Asynchronous message handling
+- Real-time updates
+- Message history tracking
 
 ## Development
 
-The project uses Eclipse IDE with Java 11. Required libraries:
+### Building the Project
 
-- JavaFX 17 SDK
-- KryoNet 2.22.9
+The project uses Eclipse IDE with Java 11. Required configurations:
+
+1. Configure JavaFX 17 SDK in your IDE
+2. Add KryoNet 2.22.9 to your build path
+3. Ensure proper module path configuration for JavaFX
+
+### Project Configuration
+
+- Java compiler compliance level: 11
+- Required VM arguments for JavaFX modules
+- KryoNet network buffer configuration
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a new Pull Request
 
 ## License
 
-This project is for educational purposes and demonstrates various network communication patterns in Java.
+This project is intended for educational purposes and demonstrates various network communication patterns in Java.
+
+## Notes
+
+- Default client buffer sizes are configured for optimal performance
+- The server supports multiple simultaneous connections
+- The system includes error handling and connection management
+- GUI is built using JavaFX for a user interface
